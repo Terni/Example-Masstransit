@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using GettingStarted.Diagnostic;
 using MassTransit;
+using MassTransit.Observables;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,11 +22,24 @@ namespace GettingStarted
             {
                 //var subscription = DiagnosticListener.AllListeners.Subscribe(new DiagnosticObserver( new MassTransitDiagnosticObserver()));
 
+                
+                using var listener = new ActivityListener
+                {
+                    ShouldListenTo = _ => true,
+                    Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+                    ActivityStarted = activity => Console.WriteLine($"{activity.ParentId}:{activity.Id} - Start"),
+                    ActivityStopped = activity => Console.WriteLine($"{activity.ParentId}:{activity.Id} - Stop")
+                };
+                
+                ActivitySource.AddActivityListener(listener);
+                
                 // web builder
                 var builder = CreateWebBuilder(args);
                 var app = builder.Build();
                 Configure(app, builder.Environment);
                 await app.RunAsync();
+                
+
                 
                 // host builder
                 //CreateHostBuilder(args).Build().Run();
@@ -52,8 +66,11 @@ namespace GettingStarted
         {
             var builder = WebApplication.CreateBuilder(args);
             
-            builder.Services.AddSingleton<MassTransitDiagnosticObserver>();
-            builder.Services.AddHostedService<DiagnosticObserver>();
+            // builder.Services.AddSingleton<MassTransitDiagnosticObserver>();
+            // builder.Services.AddHostedService<DiagnosticObserver>();
+            
+            //builder.Services.AddConsumeObserver<ConsumeObservable>();
+            builder.Services.AddConsumeObserver<ConsumeObserver>();
             
             builder.Services.AddMassTransit(x =>
             {
@@ -71,31 +88,31 @@ namespace GettingStarted
         }
         
         
-        public static IHostBuilder CreateHostBuilder(string[] args)
-        {
-            var host = Host.CreateDefaultBuilder(args)
-                .ConfigureServices((hostContext, services) =>
-                {
-                    services.AddSingleton<MassTransitDiagnosticObserver>();
-                    services.AddHostedService<DiagnosticObserver>();
-                    
-                    services.AddMassTransit(x =>
-                    {
-                        x.AddConsumer<MessageConsumer>();
-
-                        x.UsingRabbitMq((context,cfg) =>
-                        {
-                            cfg.ConfigureEndpoints(context);
-                        });
-                    });
-
-                    services.AddHostedService<Worker>();
-                    
-                    
-                });
-
-            return host;
-        }
+        // public static IHostBuilder CreateHostBuilder(string[] args)
+        // {
+        //     var host = Host.CreateDefaultBuilder(args)
+        //         .ConfigureServices((hostContext, services) =>
+        //         {
+        //             services.AddSingleton<MassTransitDiagnosticObserver>();
+        //             services.AddHostedService<DiagnosticObserver>();
+        //             
+        //             services.AddMassTransit(x =>
+        //             {
+        //                 x.AddConsumer<MessageConsumer>();
+        //
+        //                 x.UsingRabbitMq((context,cfg) =>
+        //                 {
+        //                     cfg.ConfigureEndpoints(context);
+        //                 });
+        //             });
+        //
+        //             services.AddHostedService<Worker>();
+        //             
+        //             
+        //         });
+        //
+        //     return host;
+        // }
 
     }
 }
